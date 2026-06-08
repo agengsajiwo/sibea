@@ -1,0 +1,63 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// SQLite tidak mendukung enum — gunakan String dengan validasi di level aplikasi (Zod)
+// Nilai valid untuk lokasi: DALAM_NEGERI | LUAR_NEGERI
+// Nilai valid untuk status: DRAFT | PENDING_REVIEW | PUBLISHED | REJECTED
+// Nilai valid untuk statusCrawl: SUCCESS | FAILED | PARTIAL
+
+model Scholarship {
+  id                 String    @id @default(cuid())
+  namaBeasiswa       String
+  penyelenggara      String
+  lokasi             String    // DALAM_NEGERI | LUAR_NEGERI
+  pilihanLokasi      String    // JSON array
+  skemaPembiayaan    String
+  jenisPembiayaan    String
+  komponenPembiayaan String    // JSON array
+  keterangan         String
+  linkPendaftaran    String
+  sumberCrawling     String
+  deadline           DateTime?
+  status             String    @default("DRAFT") // DRAFT | PENDING_REVIEW | PUBLISHED | REJECTED
+  contentHash        String
+  tanggalCrawling    DateTime  @default(now())
+  reviewedBy         String?
+  reviewedAt         DateTime?
+  isActive           Boolean   @default(true)
+  isManualEntry      Boolean   @default(false)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([status])
+  @@index([lokasi])
+  @@index([deadline])
+  @@index([contentHash])
+}
+
+model CrawlLog {
+  id               String   @id @default(cuid())
+  sumber           String
+  status           String   // SUCCESS | FAILED | PARTIAL
+  jumlahDitemukan  Int      @default(0)
+  jumlahBaru       Int      @default(0)
+  jumlahDiperbarui Int      @default(0)
+  errorMessage     String?
+  durasiMs         Int      @default(0)
+  createdAt        DateTime @default(now())
+}
+
+model AdminUser {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
