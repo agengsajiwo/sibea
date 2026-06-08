@@ -15,7 +15,7 @@ export default async function EditScholarshipPage({ params }: { params: { id: st
   const initialData = {
     namaBeasiswa: s.namaBeasiswa,
     penyelenggara: s.penyelenggara,
-    lokasi: s.lokasi,
+    lokasi: s.lokasi as "DALAM_NEGERI" | "LUAR_NEGERI",
     pilihanLokasi: safeParseArray(s.pilihanLokasi),
     skemaPembiayaan: s.skemaPembiayaan,
     jenisPembiayaan: s.jenisPembiayaan,

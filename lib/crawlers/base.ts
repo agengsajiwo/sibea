@@ -24,7 +24,7 @@ export class BaseCrawler {
   protected sourceUrl: string;
   private browser: Browser | null = null;
 
-  constructor(name: string, sourceUrl: string) {
+  constructor(name = "", sourceUrl = "") {
     this.name = name;
     this.sourceUrl = sourceUrl;
   }

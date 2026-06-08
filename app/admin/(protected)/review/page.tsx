@@ -35,6 +35,7 @@ export default async function ReviewPage() {
               key={s.id}
               scholarship={{
                 ...s,
+                lokasi: s.lokasi as "DALAM_NEGERI" | "LUAR_NEGERI",
                 pilihanLokasi: safeParseArray(s.pilihanLokasi),
                 komponenPembiayaan: safeParseArray(s.komponenPembiayaan),
               }}

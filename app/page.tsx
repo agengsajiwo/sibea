@@ -113,7 +113,7 @@ export default async function HomePage({ searchParams }: PageProps) {
                       id={s.id}
                       namaBeasiswa={s.namaBeasiswa}
                       penyelenggara={s.penyelenggara}
-                      lokasi={s.lokasi}
+                      lokasi={s.lokasi as "DALAM_NEGERI" | "LUAR_NEGERI"}
                       skemaPembiayaan={s.skemaPembiayaan}
                       pilihanLokasi={safeParseArray(s.pilihanLokasi)}
                       deadline={s.deadline}
