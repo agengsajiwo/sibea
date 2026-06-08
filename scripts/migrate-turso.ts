@@ -9,6 +9,7 @@
  *   TURSO_DATABASE_URL=libsql://xxx.turso.io
  *   TURSO_AUTH_TOKEN=eyJhbGci...
  */
+import "dotenv/config";
 import { createClient } from "@libsql/client";
 import fs from "fs";
 import path from "path";
