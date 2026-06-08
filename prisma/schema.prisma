@@ -3,11 +3,10 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-// SQLite tidak mendukung enum — gunakan String dengan validasi di level aplikasi (Zod)
 // Nilai valid untuk lokasi: DALAM_NEGERI | LUAR_NEGERI
 // Nilai valid untuk status: DRAFT | PENDING_REVIEW | PUBLISHED | REJECTED
 // Nilai valid untuk statusCrawl: SUCCESS | FAILED | PARTIAL
@@ -16,16 +15,16 @@ model Scholarship {
   id                 String    @id @default(cuid())
   namaBeasiswa       String
   penyelenggara      String
-  lokasi             String    // DALAM_NEGERI | LUAR_NEGERI
-  pilihanLokasi      String    // JSON array
+  lokasi             String
+  pilihanLokasi      String
   skemaPembiayaan    String
   jenisPembiayaan    String
-  komponenPembiayaan String    // JSON array
+  komponenPembiayaan String
   keterangan         String
   linkPendaftaran    String
   sumberCrawling     String
   deadline           DateTime?
-  status             String    @default("DRAFT") // DRAFT | PENDING_REVIEW | PUBLISHED | REJECTED
+  status             String    @default("DRAFT")
   contentHash        String
   tanggalCrawling    DateTime  @default(now())
   reviewedBy         String?
@@ -44,7 +43,7 @@ model Scholarship {
 model CrawlLog {
   id               String   @id @default(cuid())
   sumber           String
-  status           String   // SUCCESS | FAILED | PARTIAL
+  status           String
   jumlahDitemukan  Int      @default(0)
   jumlahBaru       Int      @default(0)
   jumlahDiperbarui Int      @default(0)
