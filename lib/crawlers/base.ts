@@ -1,4 +1,3 @@
-import { Browser, chromium, Page } from "playwright";
 import { CRAWLER_CONFIG } from "./config";
 import { RawScholarship } from "@/lib/schemas/scholarship";
 
@@ -16,41 +15,43 @@ export interface CrawlResult {
 
 /**
  * Base utility untuk semua crawler.
- * Memisahkan FETCH (ambil halaman) dari PARSE (ekstrak data)
- * agar setiap bagian bisa diuji dan diperbaiki secara independen.
+ * Menggunakan fetch + Cheerio (berjalan di Vercel serverless).
+ * Playwright dihapus — tidak kompatibel dengan serverless environment.
+ *
+ * Untuk situs yang membutuhkan JavaScript rendering, crawler akan
+ * mengembalikan data statis via getStaticEntries() sebagai fallback.
  */
 export class BaseCrawler {
   protected name: string;
   protected sourceUrl: string;
-  private browser: Browser | null = null;
 
   constructor(name = "", sourceUrl = "") {
     this.name = name;
     this.sourceUrl = sourceUrl;
   }
 
-  // FETCH: Ambil konten halaman — dapat digunakan ulang oleh semua crawler
+  // FETCH: Ambil konten halaman menggunakan fetch biasa (serverless-compatible)
   protected async fetchPage(url: string): Promise<string> {
-    let page: Page | null = null;
+    const controller = new AbortController();
+    const timeout = setTimeout(
+      () => controller.abort(),
+      CRAWLER_CONFIG.global.timeoutMs
+    );
     try {
-      if (!this.browser) {
-        this.browser = await chromium.launch({
-          headless: true,
-          args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
-        });
-      }
-      page = await this.browser.newPage();
-      await page.setExtraHTTPHeaders({ "User-Agent": CRAWLER_CONFIG.global.userAgent });
-      await page.goto(url, {
-        waitUntil: "networkidle",
-        timeout: CRAWLER_CONFIG.global.timeoutMs,
+      const res = await fetch(url, {
+        headers: {
+          "User-Agent": CRAWLER_CONFIG.global.userAgent,
+          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          "Accept-Language": "id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7",
+          "Accept-Encoding": "gzip, deflate, br",
+          "Cache-Control": "no-cache",
+        },
+        signal: controller.signal,
       });
-      // Scroll untuk memuat lazy-loaded content
-      await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-      await page.waitForTimeout(1000);
-      return await page.content();
+      if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+      return await res.text();
     } finally {
-      await page?.close();
+      clearTimeout(timeout);
     }
   }
 
@@ -62,7 +63,9 @@ export class BaseCrawler {
         return await this.fetchPage(url);
       } catch (err) {
         lastError = err as Error;
-        console.warn(`[${this.name}] Attempt ${attempt} gagal untuk ${url}: ${lastError.message}`);
+        console.warn(
+          `[${this.name}] Attempt ${attempt} gagal untuk ${url}: ${lastError.message}`
+        );
         if (attempt < CRAWLER_CONFIG.global.retryAttempts) {
           await new Promise((r) =>
             setTimeout(r, CRAWLER_CONFIG.global.retryDelayMs * attempt)
@@ -82,9 +85,8 @@ export class BaseCrawler {
         headers: { "User-Agent": CRAWLER_CONFIG.global.userAgent },
         signal: AbortSignal.timeout(5000),
       });
-      if (!resp.ok) return true; // Tidak ada robots.txt = boleh crawl
+      if (!resp.ok) return true;
       const text = await resp.text();
-      // Parsing sederhana: cek apakah bot kita atau * dilarang mengakses path
       const lines = text.split("\n").map((l) => l.trim());
       let relevant = false;
       for (const line of lines) {
@@ -102,14 +104,12 @@ export class BaseCrawler {
       }
       return true;
     } catch {
-      return true; // Asumsikan boleh jika cek gagal
+      return true;
     }
   }
 
-  async closeBrowser() {
-    await this.browser?.close();
-    this.browser = null;
-  }
+  // Kompatibilitas mundur — tidak lagi dibutuhkan tapi tetap ada agar tidak error
+  async closeBrowser() {}
 }
 
 // Jalankan semua crawler dengan error isolation per-sumber
@@ -122,7 +122,9 @@ export async function runAllCrawlers(
       console.log(`[Crawler] Memulai: ${crawler.name}`);
       const scholarships = await crawler.crawl();
       results.push({ crawlerName: crawler.name, scholarships });
-      console.log(`[Crawler] Selesai: ${crawler.name} — ${scholarships.length} item ditemukan`);
+      console.log(
+        `[Crawler] Selesai: ${crawler.name} — ${scholarships.length} item ditemukan`
+      );
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error(`[Crawler] Error pada ${crawler.name}: ${msg}`);

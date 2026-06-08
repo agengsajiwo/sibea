@@ -16,7 +16,6 @@ export class LpdpCrawler extends BaseCrawler implements ScholarshipCrawler {
     const $ = cheerio.load(html);
     const cfg = CRAWLER_CONFIG.lpdp.selectors;
     const results: Partial<RawScholarship>[] = [];
-
     $(cfg.itemList).each((_, el) => {
       const nama = sanitizeShortText($(el).find(cfg.nama).first().text());
       const keterangan = sanitizeText($(el).find(cfg.keterangan).first().text());
@@ -24,47 +23,77 @@ export class LpdpCrawler extends BaseCrawler implements ScholarshipCrawler {
       const href = $(el).find(cfg.link).first().attr("href") ?? "";
       const link = href.startsWith("http") ? href : `${CRAWLER_CONFIG.lpdp.baseUrl}${href}`;
       if (!nama) return;
-
-      // LPDP punya program dalam dan luar negeri — tentukan dari nama
-      const isLuarNegeri =
-        /luar negeri|overseas|international/i.test(nama + keterangan);
-
+      const isLuarNegeri = /luar negeri|overseas|international/i.test(nama + keterangan);
       results.push({
         namaBeasiswa: nama,
         penyelenggara: "LPDP",
         lokasi: isLuarNegeri ? "LUAR_NEGERI" : "DALAM_NEGERI",
-        pilihanLokasi: isLuarNegeri
-          ? ["Amerika Serikat", "Inggris", "Australia", "Jerman"]
-          : ["Seluruh Indonesia"],
+        pilihanLokasi: isLuarNegeri ? ["Amerika Serikat", "Inggris", "Australia", "Jerman"] : ["Seluruh Indonesia"],
         skemaPembiayaan: "Fully Funded",
         jenisPembiayaan: "Beasiswa Penuh",
         komponenPembiayaan: ["SPP/Tuition Fee", "Tunjangan Hidup", "Tunjangan Buku"],
         keterangan,
         linkPendaftaran: sanitizeUrl(link) ?? CRAWLER_CONFIG.lpdp.baseUrl,
         sumberCrawling: this.sourceUrl,
-        deadline: parseDeadlineLpdp(deadlineRaw),
+        deadline: parseDeadline(deadlineRaw),
       });
     });
     return results;
   }
 
+  private getStaticEntries(): Partial<RawScholarship>[] {
+    return [
+      {
+        namaBeasiswa: "LPDP Program Doktor Dalam Negeri",
+        penyelenggara: "LPDP",
+        lokasi: "DALAM_NEGERI",
+        pilihanLokasi: ["Seluruh Indonesia"],
+        skemaPembiayaan: "Fully Funded",
+        jenisPembiayaan: "Beasiswa Penuh",
+        komponenPembiayaan: ["SPP/Tuition Fee", "Tunjangan Hidup Bulanan", "Tunjangan Buku", "Tunjangan Penelitian"],
+        keterangan: "LPDP memberikan beasiswa doktor untuk perguruan tinggi terbaik dalam negeri.",
+        linkPendaftaran: CRAWLER_CONFIG.lpdp.baseUrl,
+        sumberCrawling: this.sourceUrl,
+        deadline: null,
+      },
+      {
+        namaBeasiswa: "LPDP Program Doktor Luar Negeri",
+        penyelenggara: "LPDP",
+        lokasi: "LUAR_NEGERI",
+        pilihanLokasi: ["Amerika Serikat", "Inggris", "Australia", "Jerman", "Belanda", "Jepang"],
+        skemaPembiayaan: "Fully Funded",
+        jenisPembiayaan: "Beasiswa Penuh",
+        komponenPembiayaan: ["Tuition Fee", "Living Allowance", "Tiket Pesawat PP", "Asuransi Kesehatan"],
+        keterangan: "LPDP untuk studi doktor di perguruan tinggi terkemuka di luar negeri.",
+        linkPendaftaran: CRAWLER_CONFIG.lpdp.baseUrl,
+        sumberCrawling: this.sourceUrl,
+        deadline: null,
+      },
+    ];
+  }
+
   async crawl(): Promise<RawScholarship[]> {
-    if (!(await this.isAllowedByRobots(this.sourceUrl))) return [];
-    const html = await this.fetchWithRetry(this.sourceUrl);
-    const raw = this.parse(html);
+    let raw: Partial<RawScholarship>[] = [];
+    try {
+      if (await this.isAllowedByRobots(this.sourceUrl)) {
+        const html = await this.fetchWithRetry(this.sourceUrl);
+        raw = this.parse(html);
+      }
+    } catch (err) {
+      console.warn(`[${this.name}] Fetch gagal, pakai data statis:`, (err as Error).message);
+    }
+    if (raw.length === 0) raw = this.getStaticEntries();
     const valid: RawScholarship[] = [];
     for (const item of raw) {
       const result = RawScholarshipSchema.safeParse(item);
       if (result.success) valid.push(result.data);
     }
-    await this.closeBrowser();
     return valid;
   }
 }
 
-function parseDeadlineLpdp(raw: string): Date | null {
+function parseDeadline(raw: string): Date | null {
   if (!raw) return null;
-  const cleaned = raw.replace(/tutup|penutupan|deadline/gi, "").trim();
-  const d = new Date(cleaned);
+  const d = new Date(raw.replace(/tutup|penutupan|deadline/gi, "").trim());
   return isNaN(d.getTime()) ? null : d;
 }
