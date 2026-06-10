@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
-import { GraduationCap, LayoutDashboard, ClipboardList, BookOpen, LogOut, User } from "lucide-react";
+import { GraduationCap, LayoutDashboard, ClipboardList, BookOpen, LogOut, User, Users } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { Button } from "@/components/ui/button";
 
@@ -10,6 +10,7 @@ const navItems = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
   { href: "/admin/review", label: "Antrian Review", icon: ClipboardList },
   { href: "/admin/scholarships", label: "Kelola Beasiswa", icon: BookOpen },
+  { href: "/admin/users", label: "Kelola Admin", icon: Users },
 ];
 
 export function AdminNav({ user }: { user?: { name?: string | null; email?: string | null } }) {
