@@ -5,8 +5,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
-import { ClipboardList, BookOpen, CheckCircle, XCircle, RefreshCw, Activity } from "lucide-react";
+import { ClipboardList, BookOpen, CheckCircle, XCircle, RefreshCw, Activity, BellRing } from "lucide-react";
 import { CrawlTriggerButton } from "@/components/CrawlTriggerButton";
+import { FreshnessPanel } from "@/components/FreshnessPanel";
+import { getFreshnessReport } from "@/lib/utils/freshness";
+
+export const dynamic = "force-dynamic";
 
 async function getDashboardData() {
   const [pending, published, rejected, recentLogs] = await Promise.all([
@@ -31,6 +35,9 @@ async function getDashboardData() {
 export default async function AdminDashboardPage() {
   const session = await getServerSession(authOptions);
   const { pending, published, rejected, latestBySumber, recentLogs } = await getDashboardData();
+  const freshness = await getFreshnessReport();
+  const totalPerluTindakan =
+    freshness.deadlineLewat.length + freshness.deadlineMendekat.length + freshness.perluVerifikasi.length;
 
   return (
     <div className="space-y-6">
@@ -81,6 +88,18 @@ export default async function AdminDashboardPage() {
           </Button>
         </div>
       )}
+
+      {/* Panel kesegaran data — pengingat deadline & verifikasi */}
+      <div>
+        <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2 mb-3">
+          <BellRing className="h-4 w-4 text-blue-600" />
+          Pengingat Kesegaran Data
+          {totalPerluTindakan > 0 && (
+            <Badge variant="warning" className="text-xs">{totalPerluTindakan} perlu tindakan</Badge>
+          )}
+        </h2>
+        <FreshnessPanel report={freshness} />
+      </div>
 
       {/* Log crawling per sumber */}
       <Card>
