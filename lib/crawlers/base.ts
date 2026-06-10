@@ -31,6 +31,7 @@ export class BaseCrawler {
   }
 
   // FETCH: Ambil konten halaman menggunakan fetch biasa (serverless-compatible)
+  // SELALU ambil data terbaru — bypass cache Next.js & CDN.
   protected async fetchPage(url: string): Promise<string> {
     const controller = new AbortController();
     const timeout = setTimeout(
@@ -38,14 +39,21 @@ export class BaseCrawler {
       CRAWLER_CONFIG.global.timeoutMs
     );
     try {
-      const res = await fetch(url, {
+      // Cache-busting: tambah query param timestamp agar tidak dapat versi cache
+      const sep = url.includes("?") ? "&" : "?";
+      const freshUrl = `${url}${sep}_t=${Date.now()}`;
+
+      const res = await fetch(freshUrl, {
         headers: {
           "User-Agent": CRAWLER_CONFIG.global.userAgent,
           "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
           "Accept-Language": "id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7",
-          "Accept-Encoding": "gzip, deflate, br",
-          "Cache-Control": "no-cache",
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+          "Pragma": "no-cache",
         },
+        // PENTING: matikan cache Next.js — tanpa ini, crawl ulang bisa
+        // mendapat HTML lama dari Data Cache Next.js, bukan data terbaru.
+        cache: "no-store",
         signal: controller.signal,
       });
       if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);

@@ -99,6 +99,10 @@ export async function processAndSaveCrawlResults(
     },
   });
 
+  // Kumpulkan ID entri yang dikonfirmasi ulang crawl ini (masih relevan)
+  // untuk menandai "terakhir diverifikasi" sekaligus di akhir.
+  const reconfirmedIds: string[] = [];
+
   for (const s of scholarships) {
     const contentHash = computeContentHash({
       namaBeasiswa: s.namaBeasiswa,
@@ -108,9 +112,13 @@ export async function processAndSaveCrawlResults(
       skemaPembiayaan: s.skemaPembiayaan,
     });
 
-    // Cek 1: contentHash exact match → sudah ada persis, skip
+    // Cek 1: contentHash exact match → sudah ada persis, tidak ada perubahan.
+    // Catat ID-nya agar tanggalCrawling diperbarui (penanda data masih fresh).
     const byHash = existingAll.find((e) => e.contentHash === contentHash);
-    if (byHash) continue;
+    if (byHash) {
+      reconfirmedIds.push(byHash.id);
+      continue;
+    }
 
     // Cek 2: nama + penyelenggara (normalized) sudah ada?
     const normNama = normalize(s.namaBeasiswa);
@@ -201,7 +209,36 @@ export async function processAndSaveCrawlResults(
     jumlahBaru++;
   }
 
+  // Tandai semua entri yang dikonfirmasi ulang sebagai "baru diverifikasi"
+  if (reconfirmedIds.length > 0) {
+    await prisma.scholarship.updateMany({
+      where: { id: { in: reconfirmedIds } },
+      data: { tanggalCrawling: new Date() },
+    });
+  }
+
   return { jumlahBaru, jumlahDiperbarui };
+}
+
+/**
+ * Auto-expire: nonaktifkan beasiswa PUBLISHED yang deadline-nya sudah lewat,
+ * agar halaman publik hanya menampilkan peluang yang masih berlaku (fresh).
+ * Dipanggil setiap crawl. Mengembalikan jumlah yang dinonaktifkan.
+ */
+export async function expirePastDeadlines(): Promise<number> {
+  const now = new Date();
+  const result = await prisma.scholarship.updateMany({
+    where: {
+      status: "PUBLISHED",
+      isActive: true,
+      deadline: { not: null, lt: now },
+    },
+    data: { isActive: false },
+  });
+  if (result.count > 0) {
+    console.log(`[Auto-expire] ${result.count} beasiswa kedaluwarsa dinonaktifkan`);
+  }
+  return result.count;
 }
 
 export async function runCrawlJob(crawlerNames?: string[]) {
@@ -210,6 +247,9 @@ export async function runCrawlJob(crawlerNames?: string[]) {
         crawlerNames.some((n) => n.toLowerCase() === c.name.toLowerCase())
       )
     : ALL_CRAWLERS;
+
+  // Bersihkan beasiswa kedaluwarsa lebih dulu agar dataset tetap fresh
+  await expirePastDeadlines();
 
   const results = await runAllCrawlers(crawlers);
 
