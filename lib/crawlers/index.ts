@@ -66,6 +66,13 @@ function normalize(s: string): string {
  * 2. Nama + penyelenggara (normalized) → cek semua status
  * 3. URL pendaftaran sama → cek semua status
  *
+ * Urutan keputusan per item hasil crawl:
+ * - contentHash persis sama (status apa pun) → skip
+ * - cocok dgn entri REJECTED → skip (hormati penolakan admin, tidak muncul lagi)
+ * - cocok dgn entri PENDING_REVIEW → skip (sudah di antrian)
+ * - cocok dgn entri PUBLISHED tapi konten berubah → buat entri pembaruan PENDING_REVIEW
+ * - benar-benar baru → buat entri PENDING_REVIEW
+ *
  * Data PUBLISHED tidak pernah ditimpa secara diam-diam.
  */
 export async function processAndSaveCrawlResults(
@@ -75,10 +82,13 @@ export async function processAndSaveCrawlResults(
   let jumlahBaru = 0;
   let jumlahDiperbarui = 0;
 
-  // Ambil semua entri yang sudah ada (PUBLISHED + PENDING_REVIEW) sekali saja
-  // untuk menghindari N+1 query
+  // Ambil semua entri yang sudah ada — termasuk REJECTED — sekali saja
+  // untuk menghindari N+1 query. REJECTED disertakan agar data yang sudah
+  // ditolak admin TIDAK muncul lagi di antrian saat crawl berikutnya.
+  // Catatan: tidak memfilter isActive agar entri PUBLISHED yang di-nonaktif-kan
+  // dan entri REJECTED tetap terhitung sebagai "sudah pernah ada".
   const existingAll = await prisma.scholarship.findMany({
-    where: { status: { in: ["PUBLISHED", "PENDING_REVIEW"] }, isActive: true },
+    where: { status: { in: ["PUBLISHED", "PENDING_REVIEW", "REJECTED"] } },
     select: {
       id: true,
       namaBeasiswa: true,
@@ -118,11 +128,22 @@ export async function processAndSaveCrawlResults(
         e.linkPendaftaran.trim().toLowerCase().replace(/\/$/, "") === normUrl
     );
 
+    // Cek REJECTED: jika nama/URL cocok dengan entri yang sudah ditolak admin,
+    // JANGAN tambahkan lagi ke antrian — hormati keputusan penolakan admin.
+    const existingRejected =
+      byName?.status === "REJECTED" || byUrl?.status === "REJECTED"
+        ? (byName?.status === "REJECTED" ? byName : byUrl)
+        : null;
+    if (existingRejected) {
+      // Data ini sudah pernah ditolak admin → skip agar tidak redundant
+      continue;
+    }
+
     const existingPublished = byName?.status === "PUBLISHED" || byUrl?.status === "PUBLISHED"
-      ? (byName ?? byUrl)
+      ? (byName?.status === "PUBLISHED" ? byName : byUrl)
       : null;
     const existingPending = byName?.status === "PENDING_REVIEW" || byUrl?.status === "PENDING_REVIEW"
-      ? (byName ?? byUrl)
+      ? (byName?.status === "PENDING_REVIEW" ? byName : byUrl)
       : null;
 
     if (existingPending) {
