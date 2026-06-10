@@ -9,6 +9,7 @@ import { ClipboardList, BookOpen, CheckCircle, XCircle, RefreshCw, Activity, Bel
 import { CrawlTriggerButton } from "@/components/CrawlTriggerButton";
 import { FreshnessPanel } from "@/components/FreshnessPanel";
 import { getFreshnessReport } from "@/lib/utils/freshness";
+import { SourceChangePanel } from "@/components/SourceChangePanel";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +39,9 @@ export default async function AdminDashboardPage() {
   const freshness = await getFreshnessReport();
   const totalPerluTindakan =
     freshness.deadlineLewat.length + freshness.deadlineMendekat.length + freshness.perluVerifikasi.length;
+  const sourceMonitors = await prisma.sourceMonitor.findMany({
+    orderBy: [{ hasUnreviewedChange: "desc" }, { sumber: "asc" }],
+  });
 
   return (
     <div className="space-y-6">
@@ -100,6 +104,9 @@ export default async function AdminDashboardPage() {
         </h2>
         <FreshnessPanel report={freshness} />
       </div>
+
+      {/* Pemantau perubahan halaman sumber (crawl-as-monitor) */}
+      <SourceChangePanel sources={sourceMonitors} />
 
       {/* Log crawling per sumber */}
       <Card>

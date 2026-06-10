@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { computeContentHash } from "@/lib/utils/hash";
 import { RawScholarship } from "@/lib/schemas/scholarship";
 import { runAllCrawlers, ScholarshipCrawler } from "./base";
+import { monitorSources } from "./monitor";
 
 import { KemdikbudCrawler } from "./kemdikbud";
 import { LpdpCrawler } from "./lpdp";
@@ -250,6 +251,18 @@ export async function runCrawlJob(crawlerNames?: string[]) {
 
   // Bersihkan beasiswa kedaluwarsa lebih dulu agar dataset tetap fresh
   await expirePastDeadlines();
+
+  // Pantau perubahan halaman sumber (crawl-as-monitor) untuk sumber stabil.
+  // Error di sini tidak menghentikan proses crawl utama.
+  try {
+    const monitorResults = await monitorSources();
+    const berubah = monitorResults.filter((m) => m.changed).map((m) => m.sumber);
+    if (berubah.length > 0) {
+      console.log(`[Monitor] Sumber berubah: ${berubah.join(", ")}`);
+    }
+  } catch (err) {
+    console.error("[Monitor] Gagal memantau sumber:", err);
+  }
 
   const results = await runAllCrawlers(crawlers);
 

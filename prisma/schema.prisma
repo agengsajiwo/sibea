@@ -60,3 +60,20 @@ model AdminUser {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+// Pemantau perubahan halaman sumber (crawl-as-monitor).
+// Untuk sumber server-rendered yang stabil (Kemdikbud, LPDP, Kemenag, BRIN):
+// crawler mengambil halaman, hash konten teksnya, dan mendeteksi perubahan
+// dibanding crawl sebelumnya. Jika berubah → tandai untuk ditinjau admin.
+model SourceMonitor {
+  id                  String    @id @default(cuid())
+  sumber              String    @unique // nama crawler, mis. "Kemdikbud BPI"
+  sourceUrl           String
+  pageHash            String    @default("") // hash teks halaman terakhir
+  lastChecked         DateTime  @default(now())
+  lastChanged         DateTime?
+  hasUnreviewedChange Boolean   @default(false)
+  lastError           String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+}
