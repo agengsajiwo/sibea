@@ -22,8 +22,11 @@ export const CRAWLER_CONFIG = {
     timeoutMs: parseInt(process.env.CRAWLER_TIMEOUT_MS ?? "30000"),
     retryAttempts: parseInt(process.env.CRAWLER_RETRY_ATTEMPTS ?? "3"),
     retryDelayMs: 2000,
+    // User-Agent seperti browser asli. UA "bot" sebelumnya sering ditolak
+    // (403) oleh situs berproteksi Cloudflare/anti-bot, termasuk banyak
+    // agregator beasiswa. UA browser jauh lebih sering lolos.
     userAgent:
-      "Mozilla/5.0 (compatible; UNUBeasiswaBot/1.0; +https://unu.ac.id/beasiswa-bot)",
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
   },
 
   // ─────────────────────────────────────────────────────────
