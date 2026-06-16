@@ -15,7 +15,7 @@ import { BaseCrawler, ScholarshipCrawler } from "./base";
 import { RawScholarship } from "@/lib/schemas/scholarship";
 import { sanitizeText, sanitizeShortText, sanitizeUrl } from "@/lib/utils/sanitize";
 import { crawlWithFallback } from "./crawler-helper";
-import { DiscoveryFeed, matchesDoctoral, matchesScholarship } from "./discovery-config";
+import { DiscoveryFeed, matchesDoctoral, matchesDoctoralStrong, matchesScholarship } from "./discovery-config";
 
 export class RssDiscoveryCrawler extends BaseCrawler implements ScholarshipCrawler {
   name: string;
@@ -57,9 +57,12 @@ export class RssDiscoveryCrawler extends BaseCrawler implements ScholarshipCrawl
       const haystack = `${title} ${deskripsi}`.toLowerCase();
 
       // SARING DOKTOR: dilewati jika feed sudah khusus PhD (assumeDoctoral).
-      // Untuk feed umum, item harus relevan doktor (S3/PhD) DAN terkait beasiswa.
+      // Untuk feed umum: relevan doktor bila JUDUL cocok (termasuk pola "S3"),
+      // atau BODY mengandung kata kunci kuat (PhD/doktor) — bukan bare "S3"
+      // agar tidak terjebak crosslink "Baca juga: Beasiswa S3 ..." di body.
       if (!this.feed.assumeDoctoral) {
-        if (!matchesDoctoral(haystack)) return;
+        const doctoral = matchesDoctoral(title) || matchesDoctoralStrong(deskripsi);
+        if (!doctoral) return;
         if (!matchesScholarship(haystack)) return;
       }
 

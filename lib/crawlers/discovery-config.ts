@@ -44,40 +44,18 @@ export const DISCOVERY_FEEDS: DiscoveryFeed[] = [
     catatan: "Terverifikasi aktif (item terbatas).",
   },
 
-  // ── LUAR NEGERI — kandidat tambahan (cek via diagnose-feeds) ───────
-  {
-    name: "OpportunitiesForAfricans (PhD)",
-    feedUrl: "https://www.opportunitiesforafricans.com/category/phd-scholarships/feed/",
-    defaultLokasi: "LUAR_NEGERI",
-    assumeDoctoral: true,
-    catatan: "Banyak memuat PhD global (tidak hanya Afrika).",
-  },
-  {
-    name: "ScholarshipDb (PhD)",
-    feedUrl: "https://scholarshipdb.net/scholarships/Program-PhD/feed",
-    defaultLokasi: "LUAR_NEGERI",
-    assumeDoctoral: true,
-    catatan: "Database global posisi PhD berbayar/beasiswa.",
-  },
-  {
-    name: "ARMACAD",
-    feedUrl: "https://armacad.info/feed",
-    defaultLokasi: "LUAR_NEGERI",
-    catatan: "Peluang akademik global; disaring kata kunci S3.",
-  },
-
-  // ── DALAM NEGERI — agregator beasiswa Indonesia ───────────────────
-  {
-    name: "IndBeasiswa",
-    feedUrl: "https://indbeasiswa.com/feed/",
-    defaultLokasi: "LUAR_NEGERI", // banyak memuat luar negeri; auto-deteksi "Indonesia"
-    catatan: "Agregator beasiswa Indonesia (dalam & luar negeri), disaring S3.",
-  },
+  // ── DALAM NEGERI — agregator beasiswa Indonesia (terverifikasi) ────
   {
     name: "Beasiswa Pascasarjana",
     feedUrl: "https://www.beasiswapascasarjana.com/feeds/posts/default?alt=rss",
     defaultLokasi: "LUAR_NEGERI",
-    catatan: "Khusus pascasarjana (S2/S3) — disaring S3/doktor.",
+    catatan: "Terverifikasi: 9 item S3. Sumber dalam-negeri utama.",
+  },
+  {
+    name: "IndBeasiswa",
+    feedUrl: "https://indbeasiswa.com/feed/",
+    defaultLokasi: "LUAR_NEGERI", // auto-deteksi "Indonesia" → DALAM_NEGERI
+    catatan: "Terverifikasi aktif. Agregator beasiswa Indonesia, disaring S3.",
   },
 ];
 
@@ -107,8 +85,8 @@ export const SCHOLARSHIP_KEYWORDS = [
 ];
 
 /**
- * Deteksi apakah teks relevan dengan program doktor (S3).
- * Mencakup kata kunci internasional + pola "S3"/"S-3" gaya Indonesia.
+ * Deteksi doktor PADA JUDUL — sensitif penuh, termasuk pola "S3" Indonesia.
+ * Judul andal: "Beasiswa S3 Unpad", "MEXT untuk S2 dan S3", "PhD Studentship".
  */
 export function matchesDoctoral(text: string): boolean {
   const lower = text.toLowerCase();
@@ -116,6 +94,17 @@ export function matchesDoctoral(text: string): boolean {
   // Pola S3 ala Indonesia: "beasiswa s3", "program s-3", "jenjang s.3"
   if (/\bs[-.\s]?3\b/.test(lower)) return true;
   return false;
+}
+
+/**
+ * Deteksi doktor "kuat" untuk BODY/deskripsi — hanya kata kunci eksplisit
+ * PhD/doctoral/doktor, TANPA pola bare "S3". Mencegah false positive dari
+ * tautan terkait/crosslink di body (mis. "Baca juga: Beasiswa S3 ...") yang
+ * sering muncul di feed Blogger/WordPress Indonesia.
+ */
+export function matchesDoctoralStrong(text: string): boolean {
+  const lower = text.toLowerCase();
+  return DOCTORAL_KEYWORDS.some((k) => lower.includes(k));
 }
 
 /** Deteksi apakah teks terkait beasiswa/pendanaan */
