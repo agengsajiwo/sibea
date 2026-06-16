@@ -1,64 +1,87 @@
 /**
- * KONFIGURASI DISCOVERY — penemuan beasiswa baru via RSS feed agregator.
+ * KONFIGURASI DISCOVERY — penemuan beasiswa S3 baru via RSS feed agregator.
  *
- * STRATEGI: utamakan feed KATEGORI-PhD (WordPress /category/.../feed/) agar
- * setiap item dijamin program doktor — jauh lebih relevan daripada feed umum
- * yang mencampur S1/S2/S3.
+ * STRATEGI:
+ * - Luar negeri: utamakan feed KATEGORI-PhD (assumeDoctoral) → semua item doktor.
+ * - Dalam negeri: feed umum agregator Indonesia, disaring kata kunci S3/doktor.
  *
  * Mengapa RSS: XML terstruktur & stabil, server-rendered, tidak butuh JS.
  *
- * ⚠️  Beberapa agregator memblokir request dari IP cloud (403) atau membatasi
- *     rate (429). Discovery bersifat best-effort: feed yang lolos akan dipakai,
- *     yang terblokir dilewati tanpa menghentikan proses.
+ * ⚠️  Sebagian agregator memblokir IP cloud (403) atau membatasi rate (429).
+ *     Discovery best-effort: feed yang lolos dipakai, yang gagal dilewati.
+ *     Gunakan /api/admin/diagnose-feeds untuk cek feed mana yang aktif dari Vercel.
  */
 
 export interface DiscoveryFeed {
   name: string;
   feedUrl: string;
   defaultLokasi: "DALAM_NEGERI" | "LUAR_NEGERI";
-  /**
-   * true = feed ini sudah khusus PhD/doktor (mis. feed kategori PhD),
-   * sehingga tidak perlu lagi disaring kata kunci doktor — ambil semua item.
-   */
+  /** true = feed sudah khusus PhD → ambil semua item tanpa saring kata kunci doktor */
   assumeDoctoral?: boolean;
   catatan?: string;
 }
 
 export const DISCOVERY_FEEDS: DiscoveryFeed[] = [
-  {
-    name: "Scholars4Dev (PhD)",
-    feedUrl: "https://www.scholars4dev.com/category/phd-scholarships/feed/",
-    defaultLokasi: "LUAR_NEGERI",
-    assumeDoctoral: true,
-    catatan: "Feed kategori PhD — setiap item adalah beasiswa doktor.",
-  },
+  // ── LUAR NEGERI — feed kategori PhD (terverifikasi aktif) ──────────
   {
     name: "ScholarshipRegion (PhD)",
     feedUrl: "https://scholarshipregion.com/category/phd-scholarships/feed/",
     defaultLokasi: "LUAR_NEGERI",
     assumeDoctoral: true,
-    catatan: "Feed kategori PhD ScholarshipRegion.",
-  },
-  {
-    name: "ScholarshipRegion (umum)",
-    feedUrl: "https://scholarshipregion.com/feed/",
-    defaultLokasi: "LUAR_NEGERI",
-    assumeDoctoral: false,
-    catatan: "Feed umum — disaring kata kunci doktor. Cadangan jika kategori kosong.",
+    catatan: "Terverifikasi: 10 item PhD. Sumber discovery utama.",
   },
   {
     name: "OpportunitiesForYouth (PhD)",
     feedUrl: "https://www.opportunitiesforyouth.org/category/scholarships/feed/",
     defaultLokasi: "LUAR_NEGERI",
-    assumeDoctoral: false,
-    catatan: "Agregator alternatif; disaring kata kunci doktor.",
+    catatan: "Terverifikasi aktif. Feed umum beasiswa, disaring S3.",
+  },
+  {
+    name: "Scholars4Dev (PhD)",
+    feedUrl: "https://www.scholars4dev.com/category/phd-scholarships/feed/",
+    defaultLokasi: "LUAR_NEGERI",
+    assumeDoctoral: true,
+    catatan: "Terverifikasi aktif (item terbatas).",
+  },
+
+  // ── LUAR NEGERI — kandidat tambahan (cek via diagnose-feeds) ───────
+  {
+    name: "OpportunitiesForAfricans (PhD)",
+    feedUrl: "https://www.opportunitiesforafricans.com/category/phd-scholarships/feed/",
+    defaultLokasi: "LUAR_NEGERI",
+    assumeDoctoral: true,
+    catatan: "Banyak memuat PhD global (tidak hanya Afrika).",
+  },
+  {
+    name: "ScholarshipDb (PhD)",
+    feedUrl: "https://scholarshipdb.net/scholarships/Program-PhD/feed",
+    defaultLokasi: "LUAR_NEGERI",
+    assumeDoctoral: true,
+    catatan: "Database global posisi PhD berbayar/beasiswa.",
+  },
+  {
+    name: "ARMACAD",
+    feedUrl: "https://armacad.info/feed",
+    defaultLokasi: "LUAR_NEGERI",
+    catatan: "Peluang akademik global; disaring kata kunci S3.",
+  },
+
+  // ── DALAM NEGERI — agregator beasiswa Indonesia ───────────────────
+  {
+    name: "IndBeasiswa",
+    feedUrl: "https://indbeasiswa.com/feed/",
+    defaultLokasi: "LUAR_NEGERI", // banyak memuat luar negeri; auto-deteksi "Indonesia"
+    catatan: "Agregator beasiswa Indonesia (dalam & luar negeri), disaring S3.",
+  },
+  {
+    name: "Beasiswa Pascasarjana",
+    feedUrl: "https://www.beasiswapascasarjana.com/feeds/posts/default?alt=rss",
+    defaultLokasi: "LUAR_NEGERI",
+    catatan: "Khusus pascasarjana (S2/S3) — disaring S3/doktor.",
   },
 ];
 
-/**
- * Kata kunci program DOKTOR. Item harus mengandung salah satunya
- * (kecuali feed dengan assumeDoctoral=true).
- */
+/** Kata kunci program DOKTOR (untuk feed non-assumeDoctoral) */
 export const DOCTORAL_KEYWORDS = [
   "phd",
   "ph.d",
@@ -68,14 +91,9 @@ export const DOCTORAL_KEYWORDS = [
   "d.phil",
   "dphil",
   "doktor",
-  "program s3",
-  "jenjang s3",
 ];
 
-/**
- * Kata kunci penanda beasiswa. Dipakai sebagai sinyal pendukung —
- * tidak wajib agar item dengan judul seperti "Clarendon PhD" tetap lolos.
- */
+/** Kata kunci penanda beasiswa (sinyal pendukung pada feed umum) */
 export const SCHOLARSHIP_KEYWORDS = [
   "scholarship",
   "fellowship",
@@ -87,3 +105,21 @@ export const SCHOLARSHIP_KEYWORDS = [
   "phd position",
   "phd vacancy",
 ];
+
+/**
+ * Deteksi apakah teks relevan dengan program doktor (S3).
+ * Mencakup kata kunci internasional + pola "S3"/"S-3" gaya Indonesia.
+ */
+export function matchesDoctoral(text: string): boolean {
+  const lower = text.toLowerCase();
+  if (DOCTORAL_KEYWORDS.some((k) => lower.includes(k))) return true;
+  // Pola S3 ala Indonesia: "beasiswa s3", "program s-3", "jenjang s.3"
+  if (/\bs[-.\s]?3\b/.test(lower)) return true;
+  return false;
+}
+
+/** Deteksi apakah teks terkait beasiswa/pendanaan */
+export function matchesScholarship(text: string): boolean {
+  const lower = text.toLowerCase();
+  return SCHOLARSHIP_KEYWORDS.some((k) => lower.includes(k));
+}
