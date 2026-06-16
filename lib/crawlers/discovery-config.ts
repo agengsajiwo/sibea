@@ -1,57 +1,63 @@
 /**
  * KONFIGURASI DISCOVERY — penemuan beasiswa baru via RSS feed agregator.
  *
- * Berbeda dari crawler bersumber-tunggal, discovery crawler memantau situs
- * AGREGATOR yang terus-menerus memposting beasiswa baru dari seluruh dunia.
- * Setiap posting baru yang relevan dengan program DOKTOR (S3) otomatis masuk
- * antrian PENDING_REVIEW untuk dikurasi admin.
+ * STRATEGI: utamakan feed KATEGORI-PhD (WordPress /category/.../feed/) agar
+ * setiap item dijamin program doktor — jauh lebih relevan daripada feed umum
+ * yang mencampur S1/S2/S3.
  *
- * Mengapa RSS, bukan scraping HTML?
- * - RSS/Atom = XML terstruktur & stabil (tidak berubah-ubah seperti layout HTML)
- * - Server-rendered, tidak butuh JavaScript → andal di serverless Vercel
- * - Posting baru muncul otomatis di feed → discovery berkelanjutan
+ * Mengapa RSS: XML terstruktur & stabil, server-rendered, tidak butuh JS.
  *
- * ⚠️  URL feed dapat berubah. Jika sebuah feed menghasilkan 0 item berkali-kali,
- *     buka situsnya dan cari URL feed terbaru (biasanya /feed/ untuk WordPress).
+ * ⚠️  Beberapa agregator memblokir request dari IP cloud (403) atau membatasi
+ *     rate (429). Discovery bersifat best-effort: feed yang lolos akan dipakai,
+ *     yang terblokir dilewati tanpa menghentikan proses.
  */
 
 export interface DiscoveryFeed {
-  name: string;        // nama tampilan
-  feedUrl: string;     // URL RSS/Atom
+  name: string;
+  feedUrl: string;
   defaultLokasi: "DALAM_NEGERI" | "LUAR_NEGERI";
+  /**
+   * true = feed ini sudah khusus PhD/doktor (mis. feed kategori PhD),
+   * sehingga tidak perlu lagi disaring kata kunci doktor — ambil semua item.
+   */
+  assumeDoctoral?: boolean;
   catatan?: string;
 }
 
 export const DISCOVERY_FEEDS: DiscoveryFeed[] = [
   {
-    name: "Scholars4Dev",
-    feedUrl: "https://www.scholars4dev.com/feed/",
+    name: "Scholars4Dev (PhD)",
+    feedUrl: "https://www.scholars4dev.com/category/phd-scholarships/feed/",
     defaultLokasi: "LUAR_NEGERI",
-    catatan: "Agregator beasiswa untuk negara berkembang — fokus internasional.",
+    assumeDoctoral: true,
+    catatan: "Feed kategori PhD — setiap item adalah beasiswa doktor.",
   },
   {
-    name: "OpportunityDesk",
-    feedUrl: "https://opportunitydesk.org/feed/",
+    name: "ScholarshipRegion (PhD)",
+    feedUrl: "https://scholarshipregion.com/category/phd-scholarships/feed/",
     defaultLokasi: "LUAR_NEGERI",
-    catatan: "Beasiswa, fellowship, dan peluang akademik global.",
+    assumeDoctoral: true,
+    catatan: "Feed kategori PhD ScholarshipRegion.",
   },
   {
-    name: "ScholarshipPositions",
-    feedUrl: "https://scholarship-positions.com/feed/",
-    defaultLokasi: "LUAR_NEGERI",
-    catatan: "Database beasiswa internasional, banyak program PhD.",
-  },
-  {
-    name: "Scholarship Region",
+    name: "ScholarshipRegion (umum)",
     feedUrl: "https://scholarshipregion.com/feed/",
     defaultLokasi: "LUAR_NEGERI",
-    catatan: "Agregator beasiswa global terbaru.",
+    assumeDoctoral: false,
+    catatan: "Feed umum — disaring kata kunci doktor. Cadangan jika kategori kosong.",
+  },
+  {
+    name: "OpportunitiesForYouth (PhD)",
+    feedUrl: "https://www.opportunitiesforyouth.org/category/scholarships/feed/",
+    defaultLokasi: "LUAR_NEGERI",
+    assumeDoctoral: false,
+    catatan: "Agregator alternatif; disaring kata kunci doktor.",
   },
 ];
 
 /**
- * Kata kunci untuk menyaring item feed yang relevan dengan program DOKTOR.
- * Item harus mengandung salah satu kata ini di judul/deskripsi.
+ * Kata kunci program DOKTOR. Item harus mengandung salah satunya
+ * (kecuali feed dengan assumeDoctoral=true).
  */
 export const DOCTORAL_KEYWORDS = [
   "phd",
@@ -67,8 +73,8 @@ export const DOCTORAL_KEYWORDS = [
 ];
 
 /**
- * Kata kunci yang menandakan beasiswa relevan (bukan sekadar berita).
- * Setidaknya satu harus cocok agar item dianggap beasiswa.
+ * Kata kunci penanda beasiswa. Dipakai sebagai sinyal pendukung —
+ * tidak wajib agar item dengan judul seperti "Clarendon PhD" tetap lolos.
  */
 export const SCHOLARSHIP_KEYWORDS = [
   "scholarship",
@@ -78,4 +84,6 @@ export const SCHOLARSHIP_KEYWORDS = [
   "grant",
   "studentship",
   "bursary",
+  "phd position",
+  "phd vacancy",
 ];

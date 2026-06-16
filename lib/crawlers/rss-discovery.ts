@@ -58,14 +58,18 @@ export class RssDiscoveryCrawler extends BaseCrawler implements ScholarshipCrawl
 
       if (!title || !link) return;
 
-      // SARING 1: harus relevan dengan program doktor
       const haystack = `${title} ${deskripsi}`.toLowerCase();
-      const isDoctoral = DOCTORAL_KEYWORDS.some((k) => haystack.includes(k));
-      if (!isDoctoral) return;
 
-      // SARING 2: harus terkait beasiswa (bukan berita umum)
-      const isScholarship = SCHOLARSHIP_KEYWORDS.some((k) => haystack.includes(k));
-      if (!isScholarship) return;
+      // SARING DOKTOR: dilewati jika feed sudah khusus PhD (assumeDoctoral).
+      // Untuk feed umum, item harus mengandung kata kunci doktor.
+      if (!this.feed.assumeDoctoral) {
+        const isDoctoral = DOCTORAL_KEYWORDS.some((k) => haystack.includes(k));
+        if (!isDoctoral) return;
+        // Sinyal beasiswa hanya divalidasi pada feed umum, sebagai penjaga
+        // agar tidak menangkap berita acak.
+        const isScholarship = SCHOLARSHIP_KEYWORDS.some((k) => haystack.includes(k));
+        if (!isScholarship) return;
+      }
 
       const safeLink = sanitizeUrl(link);
       if (!safeLink) return;

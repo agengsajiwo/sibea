@@ -39,7 +39,17 @@ export async function GET() {
       const xml = await res.text();
       entry.panjangKonten = xml.length;
 
-      // Coba parse untuk lihat berapa item S3 yang lolos saringan
+      // Hitung jumlah <item>/<entry> mentah (sebelum saringan) untuk diagnosa
+      const cheerio = await import("cheerio");
+      const $ = cheerio.load(xml, { xmlMode: true });
+      const rawCount = $("item").length > 0 ? $("item").length : $("entry").length;
+      entry.itemMentah = rawCount;
+      entry.contohJudulMentah = $($("item").length > 0 ? "item" : "entry")
+        .slice(0, 3)
+        .map((_, el) => $(el).find("title").first().text().trim())
+        .get();
+
+      // Item yang lolos saringan doktor
       const crawler = new RssDiscoveryCrawler(feed);
       const items = crawler.parse(xml);
       entry.itemDoktorLolos = items.length;
