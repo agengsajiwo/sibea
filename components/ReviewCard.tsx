@@ -36,11 +36,24 @@ export function ReviewCard({ scholarship }: { scholarship: ReviewScholarship }) 
     keterangan: scholarship.keterangan,
     linkPendaftaran: scholarship.linkPendaftaran,
     skemaPembiayaan: scholarship.skemaPembiayaan,
+    // Format YYYY-MM-DD untuk <input type="date">
+    deadline: scholarship.deadline
+      ? new Date(scholarship.deadline).toISOString().slice(0, 10)
+      : "",
   });
 
   async function handleAction(action: "approve" | "reject") {
     setLoading(action);
-    const body = action === "approve" && editMode ? { action, ...edits } : { action };
+    let body: Record<string, unknown> = { action };
+    if (action === "approve" && editMode) {
+      const { deadline, ...rest } = edits;
+      body = {
+        action,
+        ...rest,
+        // Kirim ISO datetime jika diisi, atau null jika dikosongkan
+        deadline: deadline ? new Date(deadline).toISOString() : null,
+      };
+    }
     await fetch(`/api/admin/review/${scholarship.id}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -121,6 +134,12 @@ export function ReviewCard({ scholarship }: { scholarship: ReviewScholarship }) 
               <Label className="text-xs">Skema Pembiayaan</Label>
               <Input value={edits.skemaPembiayaan}
                 onChange={(e) => setEdits(p => ({ ...p, skemaPembiayaan: e.target.value }))} />
+            </div>
+            <div>
+              <Label className="text-xs">Deadline Pendaftaran</Label>
+              <Input type="date" value={edits.deadline}
+                onChange={(e) => setEdits(p => ({ ...p, deadline: e.target.value }))} />
+              <p className="text-[11px] text-gray-400 mt-0.5">Kosongkan jika tidak ada deadline pasti.</p>
             </div>
             <div>
               <Label className="text-xs">Link Pendaftaran</Label>
