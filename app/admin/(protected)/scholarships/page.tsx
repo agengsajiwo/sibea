@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Edit, Eye, EyeOff, Bot, User } from "lucide-react";
 import { DeleteScholarshipButton } from "@/components/DeleteScholarshipButton";
+import { PublishButton } from "@/components/PublishButton";
 
 export const dynamic = "force-dynamic";
 
@@ -99,8 +100,12 @@ export default async function ScholarshipsPage({ searchParams }: PageProps) {
                     : <span className="flex items-center gap-1 text-xs text-gray-500"><Bot className="h-3 w-3" />Crawler</span>}
                 </td>
                 <td className="p-3">
-                  <div className="flex items-center justify-end gap-2">
-                    <Button variant="ghost" size="icon" asChild>
+                  <div className="flex items-center justify-end gap-1">
+                    {/* Publikasikan: untuk yang belum PUBLISHED-aktif */}
+                    {!(s.status === "PUBLISHED" && s.isActive) && (
+                      <PublishButton id={s.id} />
+                    )}
+                    <Button variant="ghost" size="icon" asChild title="Edit">
                       <Link href={`/admin/scholarships/${s.id}/edit`}>
                         <Edit className="h-4 w-4" />
                       </Link>
@@ -108,10 +113,10 @@ export default async function ScholarshipsPage({ searchParams }: PageProps) {
                     {s.isActive ? (
                       <DeleteScholarshipButton id={s.id} />
                     ) : (
-                      <EyeOff className="h-4 w-4 text-gray-300" />
+                      <span title="Nonaktif"><EyeOff className="h-4 w-4 text-gray-300" /></span>
                     )}
-                    {s.status === "PUBLISHED" && (
-                      <Button variant="ghost" size="icon" asChild>
+                    {s.status === "PUBLISHED" && s.isActive && (
+                      <Button variant="ghost" size="icon" asChild title="Lihat di publik">
                         <Link href={`/beasiswa/${s.id}`} target="_blank">
                           <Eye className="h-4 w-4 text-green-600" />
                         </Link>

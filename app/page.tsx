@@ -7,6 +7,10 @@ import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, BookOpen } from "lucide-react";
 import Link from "next/link";
 
+// Selalu render dinamis agar beasiswa yang baru di-publish langsung tampil
+// (tanpa ini Next.js bisa men-cache halaman & data lama).
+export const dynamic = "force-dynamic";
+
 const PAGE_SIZE = 12;
 
 interface PageProps {

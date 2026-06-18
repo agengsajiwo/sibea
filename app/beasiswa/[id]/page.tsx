@@ -9,6 +9,8 @@ import {
   ChevronLeft, Clock, CheckCircle, Tag, Banknote, List,
 } from "lucide-react";
 
+export const dynamic = "force-dynamic";
+
 function safeParseArray(raw: string): string[] {
   try { return JSON.parse(raw); } catch { return [raw]; }
 }

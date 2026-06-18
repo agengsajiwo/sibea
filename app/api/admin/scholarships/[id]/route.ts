@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/utils/admin-auth";
 import { ScholarshipCreateSchema } from "@/lib/schemas/scholarship";
 import { computeContentHash } from "@/lib/utils/hash";
+import { z } from "zod";
 
 export async function GET(_: NextRequest, { params }: { params: { id: string } }) {
   const { error } = await requireAdmin();
@@ -10,6 +11,36 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
   const s = await prisma.scholarship.findUnique({ where: { id: params.id } });
   if (!s) return NextResponse.json({ error: "Tidak ditemukan" }, { status: 404 });
   return NextResponse.json(s);
+}
+
+// PATCH: ubah status / aktif cepat (mis. Publikasikan dari Kelola Beasiswa)
+const PatchSchema = z.object({
+  status: z.enum(["DRAFT", "PENDING_REVIEW", "PUBLISHED", "REJECTED"]).optional(),
+  isActive: z.boolean().optional(),
+});
+
+export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+  const { error, session } = await requireAdmin();
+  if (error) return error;
+
+  const parsed = PatchSchema.safeParse(await req.json().catch(() => ({})));
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Data tidak valid" }, { status: 400 });
+  }
+
+  const { status, isActive } = parsed.data;
+  const data: Record<string, unknown> = {};
+  if (status) {
+    data.status = status;
+    data.reviewedBy = session!.user!.email!;
+    data.reviewedAt = new Date();
+    // Saat dipublikasikan, pastikan aktif agar tampil di halaman publik
+    if (status === "PUBLISHED") data.isActive = true;
+  }
+  if (isActive !== undefined) data.isActive = isActive;
+
+  const updated = await prisma.scholarship.update({ where: { id: params.id }, data });
+  return NextResponse.json(updated);
 }
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
