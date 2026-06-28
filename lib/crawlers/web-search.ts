@@ -19,15 +19,44 @@ import { RawScholarship, RawScholarshipSchema } from "@/lib/schemas/scholarship"
 import { sanitizeShortText, sanitizeText, sanitizeUrl } from "@/lib/utils/sanitize";
 import { matchesDoctoral, matchesScholarship } from "./discovery-config";
 
-/** Query pencarian — campuran S3 internasional & Indonesia, fokus fully funded. */
+/**
+ * Query pencarian — mencakup semua prodi UNU Yogyakarta + umum.
+ * Campuran internasional & Indonesia, fokus "fully funded".
+ *
+ * Hemat kuota: tidak semua dijalankan tiap crawl. Lihat selectQueries()
+ * yang merotasi & membatasi jumlah query per crawl (GOOGLE_SEARCH_MAX_QUERIES).
+ */
 export const SEARCH_QUERIES = [
+  // ── Umum ──────────────────────────────────────────────────────────
   "fully funded PhD scholarship 2026 international students apply",
   "PhD scholarship 2026 for Indonesian students fully funded",
-  "doctoral scholarship 2026 fully funded university apply",
-  "government PhD scholarship 2026 developing countries",
-  "beasiswa S3 luar negeri 2026 fully funded",
-  "beasiswa doktor 2026 dosen dalam negeri",
+  "government PhD scholarship 2026 developing countries fully funded",
+  "beasiswa S3 luar negeri 2026 fully funded dosen",
+  "beasiswa doktor dalam negeri 2026",
+  // ── Per prodi UNU ─────────────────────────────────────────────────
+  "PhD scholarship Islamic studies 2026 fully funded",                 // Studi Islam Interdisipliner
+  "PhD scholarship management accounting business 2026 fully funded",  // Manajemen, Akuntansi
+  "PhD scholarship computer science informatics 2026 fully funded",    // Informatika, Teknik Komputer
+  "PhD scholarship electrical engineering 2026 fully funded",          // Teknik Elektro
+  "PhD scholarship agriculture food technology 2026 fully funded",     // THP, Agribisnis
+  "PhD scholarship pharmacy pharmaceutical sciences 2026 fully funded",// Farmasi
+  "PhD scholarship education primary teaching 2026 fully funded",       // PGSD
+  "PhD scholarship English language teaching TESOL 2026 fully funded", // PBI
 ];
+
+/**
+ * Pilih subset query untuk crawl ini — merotasi berdasarkan jam agar lintas
+ * waktu semua prodi tercakup, sambil membatasi jumlah demi hemat kuota.
+ * Default 8 query/crawl → muat ~12 crawl/hari dalam kuota gratis 100/hari.
+ */
+export function selectQueries(now: number): string[] {
+  const max = Math.max(1, parseInt(process.env.GOOGLE_SEARCH_MAX_QUERIES ?? "8"));
+  if (max >= SEARCH_QUERIES.length) return SEARCH_QUERIES;
+  // Rotasi titik mulai per jam agar query berbeda tiap crawl
+  const offset = Math.floor(now / 3_600_000) % SEARCH_QUERIES.length;
+  const rotated = [...SEARCH_QUERIES.slice(offset), ...SEARCH_QUERIES.slice(0, offset)];
+  return rotated.slice(0, max);
+}
 
 /**
  * Domain yang DIBUANG dari hasil — agregator/blog beasiswa & situs generik.
@@ -74,8 +103,9 @@ export class WebSearchDiscoveryCrawler extends BaseCrawler implements Scholarshi
 
     const seenLinks = new Set<string>();
     const candidates: Partial<RawScholarship>[] = [];
+    const queries = selectQueries(Date.now());
 
-    for (const query of SEARCH_QUERIES) {
+    for (const query of queries) {
       try {
         const url =
           `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${cx}` +
@@ -141,7 +171,7 @@ export class WebSearchDiscoveryCrawler extends BaseCrawler implements Scholarshi
       const result = RawScholarshipSchema.safeParse(item);
       if (result.success) valid.push(result.data);
     }
-    console.log(`[Web Search] ${valid.length} kandidat sumber baru ditemukan dari ${SEARCH_QUERIES.length} query.`);
+    console.log(`[Web Search] ${valid.length} kandidat sumber baru ditemukan dari ${queries.length} query.`);
     return valid;
   }
 }
