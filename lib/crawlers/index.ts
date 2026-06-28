@@ -3,8 +3,7 @@ import { computeContentHash } from "@/lib/utils/hash";
 import { RawScholarship } from "@/lib/schemas/scholarship";
 import { runAllCrawlers, ScholarshipCrawler } from "./base";
 import { monitorSources } from "./monitor";
-import { RssDiscoveryCrawler } from "./rss-discovery";
-import { DISCOVERY_FEEDS } from "./discovery-config";
+import { WebSearchDiscoveryCrawler } from "./web-search";
 
 import { KemdikbudCrawler } from "./kemdikbud";
 import { LpdpCrawler } from "./lpdp";
@@ -50,9 +49,10 @@ export const ALL_CRAWLERS: ScholarshipCrawler[] = [
   new SingaCrawler(),
   new WageningenCrawler(),
   new TechFellowshipCrawler(),
-  // Discovery crawlers — temukan beasiswa S3 BARU dari RSS feed agregator.
-  // Hasilnya selalu masuk PENDING_REVIEW untuk dikurasi admin.
-  ...DISCOVERY_FEEDS.map((feed) => new RssDiscoveryCrawler(feed)),
+  // Penemuan sumber BARU via pencarian web (Google Custom Search).
+  // Hanya situs resmi yang lolos (agregator dibuang). Hasil → PENDING_REVIEW.
+  // Aktif hanya jika GOOGLE_SEARCH_API_KEY & GOOGLE_SEARCH_CX diset.
+  new WebSearchDiscoveryCrawler(),
 ];
 
 export function getCrawlerByName(name: string): ScholarshipCrawler | undefined {
