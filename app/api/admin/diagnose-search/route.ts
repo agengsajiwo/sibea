@@ -1,69 +1,50 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/utils/admin-auth";
-import { SEARCH_QUERIES, EXCLUDED_DOMAINS } from "@/lib/crawlers/web-search";
-import { matchesDoctoral, matchesScholarship } from "@/lib/crawlers/discovery-config";
+import { SEARCH_QUERIES, getSearchProvider, runSearch, isRelevantResult } from "@/lib/crawlers/web-search";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
 /**
- * Diagnostik penemuan via pencarian web — tes konfigurasi & 1 query contoh
+ * Diagnostik penemuan via pencarian web — tes penyedia & 1 query contoh
  * langsung dari server Vercel. Buka /api/admin/diagnose-search saat login admin.
  */
 export async function GET() {
   const { error } = await requireAdmin();
   if (error) return error;
 
-  const apiKey = process.env.GOOGLE_SEARCH_API_KEY;
-  const cx = process.env.GOOGLE_SEARCH_CX;
-
-  if (!apiKey || !cx) {
+  const provider = getSearchProvider();
+  if (!provider) {
     return NextResponse.json({
       konfigurasi: "BELUM DISET",
       pesan:
-        "GOOGLE_SEARCH_API_KEY dan/atau GOOGLE_SEARCH_CX belum diset di Vercel. " +
-        "Penemuan sumber baru via web tidak aktif. Lihat README untuk cara setup.",
-      adaApiKey: !!apiKey,
-      adaCx: !!cx,
+        "Tidak ada penyedia pencarian aktif. Set SERPER_API_KEY (disarankan) " +
+        "ATAU GOOGLE_SEARCH_API_KEY + GOOGLE_SEARCH_CX di Vercel, lalu Redeploy.",
+      adaSerper: !!process.env.SERPER_API_KEY,
+      adaGoogle: !!(process.env.GOOGLE_SEARCH_API_KEY && process.env.GOOGLE_SEARCH_CX),
     });
   }
 
-  // Tes 1 query contoh
   const query = SEARCH_QUERIES[0];
-  const out: Record<string, unknown> = { konfigurasi: "OK", queryUji: query };
+  const out: Record<string, unknown> = { konfigurasi: "OK", penyedia: provider, queryUji: query };
+
   try {
-    const url =
-      `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${cx}&num=10&q=${encodeURIComponent(query)}`;
-    const res = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(15000) });
-    out.httpStatus = res.status;
-    const data = await res.json();
-
-    if (!res.ok) {
-      out.error = data?.error?.message ?? "Permintaan gagal";
-      return NextResponse.json(out);
-    }
-
-    const items: { title?: string; link?: string; snippet?: string; displayLink?: string }[] =
-      Array.isArray(data.items) ? data.items : [];
-    out.totalHasilMentah = items.length;
-
-    const lolos = items.filter((it) => {
-      const domain = (it.displayLink ?? "").toLowerCase().replace(/^www\./, "");
-      if (EXCLUDED_DOMAINS.some((d) => domain.includes(d))) return false;
-      const hay = `${it.title ?? ""} ${it.snippet ?? ""}`;
-      return matchesDoctoral(hay) && matchesScholarship(hay);
-    });
-
+    const results = await runSearch(query);
+    out.totalHasilMentah = results.length;
+    const lolos = results.filter(isRelevantResult);
     out.lolosSaringan = lolos.length;
-    out.contohLolos = lolos.slice(0, 5).map((it) => ({
-      judul: it.title,
-      domain: it.displayLink,
-      link: it.link,
+    out.contohLolos = lolos.slice(0, 5).map((r) => ({
+      judul: r.title,
+      domain: r.domain,
+      link: r.link,
     }));
-    out.kuotaInfo = "Google Custom Search gratis ~100 query/hari. Tiap crawl pakai " +
-      `${SEARCH_QUERIES.length} query.`;
+    out.pesan =
+      lolos.length > 0
+        ? "Berhasil! Penemuan sumber baru aktif. Jalankan 'Crawl Semua' lalu cek Antrian Review."
+        : "Penyedia OK tapi 0 hasil lolos saringan untuk query ini — coba jalankan Crawl Semua (query lain mungkin memberi hasil).";
   } catch (err) {
     out.error = err instanceof Error ? err.message : String(err);
+    out.pesan = "Penyedia terkonfigurasi tapi permintaan gagal — cek pesan error di atas.";
   }
 
   return NextResponse.json(out);
