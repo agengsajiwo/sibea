@@ -23,12 +23,16 @@ import { matchesDoctoral, matchesScholarship } from "./discovery-config";
  * Ditambah beberapa query penyelenggara resmi non-akademik.
  */
 export const SEARCH_QUERIES = [
-  // ── Umum, diarahkan ke domain resmi ───────────────────────────────
+  // ── Luar negeri, diarahkan ke domain resmi ────────────────────────
   "fully funded PhD scholarship 2026 site:edu",
   "PhD studentship 2026 fully funded site:ac.uk",
   "PhD scholarship international students 2026 site:edu.au",
-  "beasiswa S3 doktor 2026 site:ac.id",
   "PhD scholarship 2026 funded site:ac.jp",
+  // ── DALAM NEGERI — universitas & pemerintah Indonesia ──────────────
+  "beasiswa S3 doktor 2026 site:ac.id",             // universitas Indonesia
+  "program doktor beasiswa 2026 site:ac.id",         // universitas Indonesia
+  "beasiswa doktor dalam negeri 2026 site:go.id",    // pemerintah Indonesia
+  "beasiswa S3 dosen 2026 site:go.id",               // pemerintah (dosen)
   // ── Per prodi UNU (di domain resmi) ────────────────────────────────
   "PhD scholarship Islamic studies 2026 funded site:edu",             // Studi Islam
   "PhD scholarship management accounting 2026 funded site:ac.uk",      // Manajemen, Akuntansi
