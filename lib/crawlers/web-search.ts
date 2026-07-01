@@ -46,37 +46,50 @@ export const EXCLUDED_DOMAINS = [
 ];
 
 /**
- * Heuristik: apakah hasil kemungkinan dari SITUS RESMI penyelenggara
- * (universitas/pemerintah/yayasan), bukan blog/agregator/listicle.
+ * Allowlist domain penyelenggara beasiswa RESMI yang memakai TLD non-akademik
+ * (.org/.de/.nl/.se/dll). Domain akademik/pemerintah (.edu/.gov/.ac.xx/.go.id)
+ * ditangani otomatis oleh pola TLD, jadi tak perlu didaftar di sini.
+ * ⚠️ Admin bisa menambah domain resmi baru ke sini bila perlu.
+ */
+export const OFFICIAL_DOMAINS = [
+  "chevening.org", "daad.de", "daadindonesia.org", "aminef.or.id",
+  "campusfrance.org", "stipendiumhungaricum.hu", "isdb.org", "wur.nl",
+  "searca.org", "adb.org", "sacm.org.sa", "nuffic.nl",
+  "australiaawardsindonesia.org", "research.google", "microsoft.com",
+  "fordfoundation.org", "britishcouncil.org", "britishcouncil.or.id",
+  "seameo.org", "boell.de", "fes.de", "si.se", "amci.ma", "qf.org.qa",
+  "akdn.org", "rotary.org", "campuschina.org", "gatescambridge.org",
+  "wellcome.org", "commonwealth.org", "orangetulipscholarship.org",
+  "daad-indonesia.org", "eiffel.campusfrance.org", "vlir.be",
+];
+
+/**
+ * ALLOWLIST — hanya loloskan hasil yang JELAS dari situs resmi penyelenggara:
+ *   (a) domain akademik/pemerintah (.edu, .gov, .ac.xx, .gov.xx, .go.id, .europa.eu), ATAU
+ *   (b) domain penyelenggara resmi yang terdaftar (OFFICIAL_DOMAINS).
+ * Selain itu DITOLAK — mencegah agregator/blog/komersial bocor (whack-a-mole).
  */
 export function isLikelyOfficial(r: SearchResult): boolean {
   const d = r.domain;
   let path = "";
   try { path = new URL(r.link).pathname.toLowerCase(); } catch { /* ignore */ }
 
-  // 1. Blokir domain agregator/generik yang sudah dikenal
+  // Hard-block: agregator dikenal, URL blog, judul listicle
   if (EXCLUDED_DOMAINS.some((x) => d.includes(x))) return false;
-
-  // 2. Blokir URL blog (halaman blog bukan halaman resmi beasiswa)
   if (/\/blogs?(\/|$)/.test(path) || path.startsWith("/blog")) return false;
-
-  // 3. Blokir judul listicle/panduan ("Top 15...", "Best Countries...", "How to...", "10 ...")
   if (/^\s*(top\s+\d+|best\s+|how\s+to\s+|ultimate\s+guide|\d+\s+(best|top|fully|scholarship))/i.test(r.title)) return false;
   if (/best countries|list of|ultimate guide|cara mendapat/i.test(r.title)) return false;
 
-  // 4. Domain akademik/pemerintah → hampir pasti resmi (universitas/gov)
-  //    .edu, .gov, .ac.xx, .gov.xx, .go.id, .edu.xx
+  // (a) Domain akademik/pemerintah → resmi
   if (/\.(edu|gov)$/.test(d)) return true;
-  if (/\.(ac|edu|gov|go)\.[a-z]{2,3}$/.test(d)) return true;
+  if (/\.(ac|edu|gov|go|gouv|gc)\.[a-z]{2,3}$/.test(d)) return true;
+  if (d === "europa.eu" || d.endsWith(".europa.eu")) return true;
 
-  // 5. Domain lain (.org/.com/.de/dll): blokir bila BRAND-nya berbau agregator
-  //    (mengandung kata scholarship/scholar/phd/opportunit/beasiswa/studyin/fund).
-  //    Situs resmi biasanya bernama institusi (chevening, daad, fulbright, dll).
-  const brand = d.split(".")[0];
-  if (/(scholar|phd|opportun|beasiswa|studyin|fund|grants?)/.test(brand)) return false;
+  // (b) Penyelenggara resmi terdaftar
+  if (OFFICIAL_DOMAINS.some((x) => d === x || d.endsWith("." + x))) return true;
 
-  // 6. Selain itu, izinkan (kemungkinan yayasan/lembaga resmi: chevening.org, daad.de)
-  return true;
+  // Selain itu → tolak (kemungkinan agregator/blog/komersial)
+  return false;
 }
 
 export interface SearchResult {
