@@ -14,21 +14,31 @@ import { RawScholarship, RawScholarshipSchema } from "@/lib/schemas/scholarship"
 import { sanitizeShortText, sanitizeText, sanitizeUrl } from "@/lib/utils/sanitize";
 import { matchesDoctoral, matchesScholarship } from "./discovery-config";
 
-/** Query pencarian — mencakup semua prodi UNU + umum. */
+/**
+ * Query pencarian — memakai operator `site:` Google agar hasilnya LANGSUNG
+ * dari domain resmi (universitas .edu/.ac.xx, pemerintah .go.xx), bukan
+ * listicle/agregator yang biasa merajai query umum "fully funded scholarship".
+ *
+ * Campuran: TLD akademik besar (edu, ac.uk, edu.au, ac.id, ac.jp) + per prodi.
+ * Ditambah beberapa query penyelenggara resmi non-akademik.
+ */
 export const SEARCH_QUERIES = [
-  "fully funded PhD scholarship 2026 international students apply",
-  "PhD scholarship 2026 for Indonesian students fully funded",
-  "government PhD scholarship 2026 developing countries fully funded",
-  "beasiswa S3 luar negeri 2026 fully funded dosen",
-  "beasiswa doktor dalam negeri 2026",
-  "PhD scholarship Islamic studies 2026 fully funded",                 // Studi Islam
-  "PhD scholarship management accounting business 2026 fully funded",  // Manajemen, Akuntansi
-  "PhD scholarship computer science informatics 2026 fully funded",    // Informatika, Tek. Komputer
-  "PhD scholarship electrical engineering 2026 fully funded",          // Teknik Elektro
-  "PhD scholarship agriculture food technology 2026 fully funded",     // THP, Agribisnis
-  "PhD scholarship pharmacy pharmaceutical sciences 2026 fully funded",// Farmasi
-  "PhD scholarship education primary teaching 2026 fully funded",       // PGSD
-  "PhD scholarship English language teaching TESOL 2026 fully funded", // PBI
+  // ── Umum, diarahkan ke domain resmi ───────────────────────────────
+  "fully funded PhD scholarship 2026 site:edu",
+  "PhD studentship 2026 fully funded site:ac.uk",
+  "PhD scholarship international students 2026 site:edu.au",
+  "beasiswa S3 doktor 2026 site:ac.id",
+  "PhD scholarship 2026 funded site:ac.jp",
+  // ── Per prodi UNU (di domain resmi) ────────────────────────────────
+  "PhD scholarship Islamic studies 2026 funded site:edu",             // Studi Islam
+  "PhD scholarship management accounting 2026 funded site:ac.uk",      // Manajemen, Akuntansi
+  "PhD scholarship computer science 2026 funded site:edu",            // Informatika, Tek. Komputer
+  "PhD studentship electrical engineering 2026 site:ac.uk",           // Teknik Elektro
+  "PhD scholarship agriculture food science 2026 funded site:edu",    // THP, Agribisnis
+  "PhD scholarship pharmacy 2026 funded site:edu",                    // Farmasi
+  "PhD scholarship education teaching 2026 funded site:edu",          // PGSD, PBI
+  // ── Penyelenggara resmi non-akademik (lolos via OFFICIAL_DOMAINS) ──
+  "PhD scholarship 2026 fully funded government official",
 ];
 
 /** Domain agregator/blog/generik yang dibuang secara eksplisit. */
