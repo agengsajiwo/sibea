@@ -31,7 +31,7 @@ export const SEARCH_QUERIES = [
   "PhD scholarship English language teaching TESOL 2026 fully funded", // PBI
 ];
 
-/** Domain agregator/blog/generik yang dibuang — hanya situs resmi yang lolos. */
+/** Domain agregator/blog/generik yang dibuang secara eksplisit. */
 export const EXCLUDED_DOMAINS = [
   "scholars4dev.com", "opportunitydesk.org", "scholarshipregion.com",
   "scholarship-positions.com", "scholarshippositions.com", "opportunitiesforyouth.org",
@@ -39,10 +39,45 @@ export const EXCLUDED_DOMAINS = [
   "armacad.info", "opportunitiesforafricans.com", "youthop.com",
   "scholarshipair.com", "findaphd.com", "afterschoolafrica.com",
   "scholarshipscorner.website", "scholarshiproar.com", "fastweb.com", "scholarship.com",
+  "pforphd.com", "wemakescholars.com", "applykite.com", "williamlebeau.com",
   "facebook.com", "twitter.com", "x.com", "instagram.com", "linkedin.com",
   "youtube.com", "wikipedia.org", "reddit.com", "quora.com", "medium.com",
   "pinterest.com", "tiktok.com", "blogspot.com", "wordpress.com",
 ];
+
+/**
+ * Heuristik: apakah hasil kemungkinan dari SITUS RESMI penyelenggara
+ * (universitas/pemerintah/yayasan), bukan blog/agregator/listicle.
+ */
+export function isLikelyOfficial(r: SearchResult): boolean {
+  const d = r.domain;
+  let path = "";
+  try { path = new URL(r.link).pathname.toLowerCase(); } catch { /* ignore */ }
+
+  // 1. Blokir domain agregator/generik yang sudah dikenal
+  if (EXCLUDED_DOMAINS.some((x) => d.includes(x))) return false;
+
+  // 2. Blokir URL blog (halaman blog bukan halaman resmi beasiswa)
+  if (/\/blogs?(\/|$)/.test(path) || path.startsWith("/blog")) return false;
+
+  // 3. Blokir judul listicle/panduan ("Top 15...", "Best Countries...", "How to...", "10 ...")
+  if (/^\s*(top\s+\d+|best\s+|how\s+to\s+|ultimate\s+guide|\d+\s+(best|top|fully|scholarship))/i.test(r.title)) return false;
+  if (/best countries|list of|ultimate guide|cara mendapat/i.test(r.title)) return false;
+
+  // 4. Domain akademik/pemerintah → hampir pasti resmi (universitas/gov)
+  //    .edu, .gov, .ac.xx, .gov.xx, .go.id, .edu.xx
+  if (/\.(edu|gov)$/.test(d)) return true;
+  if (/\.(ac|edu|gov|go)\.[a-z]{2,3}$/.test(d)) return true;
+
+  // 5. Domain lain (.org/.com/.de/dll): blokir bila BRAND-nya berbau agregator
+  //    (mengandung kata scholarship/scholar/phd/opportunit/beasiswa/studyin/fund).
+  //    Situs resmi biasanya bernama institusi (chevening, daad, fulbright, dll).
+  const brand = d.split(".")[0];
+  if (/(scholar|phd|opportun|beasiswa|studyin|fund|grants?)/.test(brand)) return false;
+
+  // 6. Selain itu, izinkan (kemungkinan yayasan/lembaga resmi: chevening.org, daad.de)
+  return true;
+}
 
 export interface SearchResult {
   title: string;
@@ -130,11 +165,11 @@ export function selectQueries(now: number): string[] {
   return rotated.slice(0, max);
 }
 
-/** Apakah hasil pencarian layak jadi kandidat beasiswa S3 dari situs resmi. */
+/** Apakah hasil layak jadi kandidat: relevan S3+beasiswa DAN dari situs resmi. */
 export function isRelevantResult(r: SearchResult): boolean {
-  if (EXCLUDED_DOMAINS.some((d) => r.domain.includes(d))) return false;
   const haystack = `${r.title} ${r.snippet}`;
-  return matchesDoctoral(haystack) && matchesScholarship(haystack);
+  if (!matchesDoctoral(haystack) || !matchesScholarship(haystack)) return false;
+  return isLikelyOfficial(r);
 }
 
 export class WebSearchDiscoveryCrawler extends BaseCrawler implements ScholarshipCrawler {
