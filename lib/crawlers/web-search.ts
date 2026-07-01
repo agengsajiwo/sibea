@@ -129,6 +129,17 @@ function domainOf(link: string): string {
   }
 }
 
+// Public suffix 2-level (mis. ac.uk, go.id, edu.au) agar domain terdaftar
+// diambil benar: "brighton.ac.uk", "kemenag.go.id" — bukan "ac.uk"/"go.id".
+const MULTI_SUFFIX = /\.(ac|co|go|gov|edu|or|net|sch|mil)\.[a-z]{2}$/;
+
+/** Domain terdaftar (eTLD+1) — menangani TLD berlapis negara. */
+export function registrableDomain(domain: string): string {
+  const parts = domain.split(".");
+  if (parts.length >= 3 && MULTI_SUFFIX.test(domain)) return parts.slice(-3).join(".");
+  return parts.slice(-2).join(".");
+}
+
 /** Jalankan satu query di penyedia yang aktif → hasil ternormalisasi. */
 export async function runSearch(query: string): Promise<SearchResult[]> {
   const provider = getSearchProvider();
@@ -214,6 +225,8 @@ export class WebSearchDiscoveryCrawler extends BaseCrawler implements Scholarshi
     }
 
     const seenLinks = new Set<string>();
+    const domainCount = new Map<string, number>(); // batasi jumlah per domain
+    const MAX_PER_DOMAIN = Math.max(1, parseInt(process.env.WEBSEARCH_MAX_PER_DOMAIN ?? "3"));
     const candidates: Partial<RawScholarship>[] = [];
     const queries = selectQueries(Date.now());
 
@@ -224,6 +237,13 @@ export class WebSearchDiscoveryCrawler extends BaseCrawler implements Scholarshi
           const safeLink = sanitizeUrl(r.link);
           if (!safeLink || seenLinks.has(safeLink)) continue;
           if (!isRelevantResult(r)) continue;
+
+          // Anti-redundansi domain: batasi maksimal N entri per website per crawl,
+          // agar antrian tidak didominasi satu situs (mis. 10 halaman 1 universitas).
+          const baseDomain = registrableDomain(r.domain);
+          const count = domainCount.get(baseDomain) ?? 0;
+          if (count >= MAX_PER_DOMAIN) continue;
+          domainCount.set(baseDomain, count + 1);
 
           seenLinks.add(safeLink);
           const title = sanitizeShortText(r.title).slice(0, 200);
